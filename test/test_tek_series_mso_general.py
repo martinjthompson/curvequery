@@ -2,6 +2,7 @@ import pytest
 
 # noinspection PyProtectedMember
 from curvequery._tek_series_mso import get_event_queue
+from curvequery._tek_series_mso_curve_feat import _parse_sources_from_select_query
 
 INVALID_COMMAND = "INVALID:COMMAND"
 
@@ -66,3 +67,10 @@ def test_setup_setter_restores_ch2(all_series_osc):
         all_series_osc.setup(settings)
         actual = all_series_osc.query(":DISPLAY:GLOBAL:CH2:STATE?").strip()
         assert actual == "1"
+
+def test_parse_sources_from_select_query():
+    """Verify that the source parser does the right things"""
+    assert _parse_sources_from_select_query(":SELECT:DIGGRP1:DALL 0;:SELECT:DIGGRP2:DALL 0;:SELECT:DIGGRP3:DALL 0;:SELECT:DIGGRP4:DALL 0;:SELECT:DIGGRP5:DALL 0;:SELECT:DIGGRP6:DALL 0;:SELECT:DIGGRP7:DALL 0;:SELECT:DIGGRP8:DALL 1;:SELECT:CH1 1;CH2 0;:SELECT:CH3 0;CH4 0;:SELECT:CH5 0;CH6 0;:SELECT:CH7 1;CH8 0") == ['CH1', 'CH7', 'CH8_DALL']
+
+
+

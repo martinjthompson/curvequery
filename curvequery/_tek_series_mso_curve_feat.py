@@ -17,6 +17,24 @@ from ._pyvisa_tqdm_patch import read_binary_values_progress_bar
 from ._pyvisa_tqdm_patch import read_bytes_progress_bar
 
 
+def _parse_sources_from_select_query(source_text):
+    """Take the list of sources returned from a `SELECT?` query with header and verbose set to ON and return a list of channels"""
+    # Format is something like: :SELECT:DIGGRP1:DALL 0;:SELECT:DIGGRP2:DALL 0;:SELECT:DIGGRP3:DALL 0;:SELECT:DIGGRP4:DALL 0;:SELECT:DIGGRP5:DALL 0;:SELECT:DIGGRP6:DALL 0;:SELECT:DIGGRP7:DALL 0;:SELECT:DIGGRP8:DALL 1;:SELECT:CH1 1;CH2 0;:SELECT:CH3 0;CH4 0;:SELECT:CH5 0;CH6 0;:SELECT:CH7 1;CH8 0
+    source_text = source_text.replace(':SELECT:', '')
+    all_channels = source_text.split(';')
+    enabled_channels = []
+    for i in range(len(all_channels)):
+        name, enabled = all_channels[i].split(' ')
+        if not enabled == '1':
+            continue
+        if name.startswith('DIGGRP'):
+            assert len(name) == 12, f"Name of digital group '{name}' is not 12 characters long - we rely on this exactly"
+            name = "CH"+name[6]+"_DALL"
+        enabled_channels.append(name)                
+    enabled_channels.sort()
+    return enabled_channels
+
+
 class TekSeriesCurveFeat(base.FeatureBase):
     def feature(self, *, use_pbar=True, decompose_dch=True, verbose=False):
         """
@@ -104,16 +122,19 @@ class TekSeriesCurveFeat(base.FeatureBase):
         bottom = scale * (-5 - position)
         return YScale(top=top, bottom=bottom)
 
+
     def _list_sources(self, instr):
         """Returns a list of channel name strings that we could query"""
-        available_waveforms = instr.query("data:source:available?").strip().split(",")
 
-        # Condense digital channel bits into a single channel
-        available_channels = set([i.split("_")[0] for i in available_waveforms])
+        # data:source:available does not return the digital channels on this scope, so we have to parse from a select query
+        instr.write("verbose ON;header ON")
+        result_string = instr.query("select?")
+        instr.write("verbose OFF;header OFF")
+        available_waveforms = _parse_sources_from_select_query(result_string)
 
         # Only include channels that available for download
         useful_channels = [
-            i for i in available_channels if self._has_data_available(instr, i)
+            i for i in available_waveforms if self._has_data_available(instr, i)
         ]
 
         # Return only waveforms that are available and have a corresponding useful
