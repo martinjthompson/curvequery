@@ -87,7 +87,7 @@ class TekSeriesCurveFeat(base.FeatureBase):
             display_on = bool(
                 int(instr.query("display:global:{}:state?".format(source)))
             )
-            print (source, display_on)
+            # print (source, display_on)
         return display_on
 
     @staticmethod
@@ -130,24 +130,24 @@ class TekSeriesCurveFeat(base.FeatureBase):
         """Returns a list of channel name strings that we could query"""
 
         # data:source:available does not return the digital channels on this scope, so we have to parse from a select query
-        print ("Using select2")
+        # print ("Using select2")
         instr.write("verbose ON;header ON")
         result_string = instr.query("select?")
         instr.write("verbose OFF;header OFF")
         available_waveforms = _parse_sources_from_select_query(result_string)
-        print (f"   Wfm:{available_waveforms}")
+        # print (f"   Wfm:{available_waveforms}")
         # Only include channels that available for download
         useful_channels = [
             i for i in available_waveforms if self._has_data_available(instr, i)
         ]
-        print (f"Useful:{useful_channels}")
+        # print (f"Useful:{useful_channels}")
 
         # Return only waveforms that are available and have a corresponding useful
         # channel
         useful_waveforms = [
             i for i in available_waveforms if i in useful_channels
         ]
-        print (f"UseWfm{useful_waveforms}")
+        # print (f"UseWfm{useful_waveforms}")
         return useful_waveforms
 
     def _make_jobs(self, instr, sources):
