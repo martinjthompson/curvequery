@@ -1,3 +1,4 @@
+import logging
 import types
 from functools import reduce
 
@@ -243,7 +244,8 @@ class TekSeriesCurveFeat(base.FeatureBase):
 
     def _get_data(self, instr, sources, use_pbar, decompose_dch):
         """Returns an iterator that yields the source data from the oscilloscope"""
-
+        if decompose_dch:
+            logging.warning("Are you sure you want decompose_dch? It seems to end up with no digital data at all.")
         jobs = self._make_jobs(instr, sources)
         pbar_disabled = not use_pbar
 
@@ -281,7 +283,7 @@ class TekSeriesCurveFeat(base.FeatureBase):
             )
 
             for source in jobs:
-
+                
                 self._setup_curve_query(instr, source, jobs)
 
                 # extract the job parameters
