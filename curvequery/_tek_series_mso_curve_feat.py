@@ -293,46 +293,53 @@ class TekSeriesCurveFeat(base.FeatureBase):
                 # Horizontal scale information
                 x_scale = self._get_xscale(instr)
                 if x_scale is not None:
-
+                    
                     # Issue the curve query command
                     instr.write("curv?")
+                    fastframe_count = 1
+                    fastframe_on = bool(int(instr.query('HOR:FAST:STATE?')))
+                    log.critical(f'Fast frame on : {fastframe_on}')
+                    if fastframe_on:
+                        fastframe_count = int(instr.query('HOR:FAST:COUN?'))
+                    log.critical(f'Fast frame count: {fastframe_count}')
+                    for _frame in range(fastframe_count):
+                        log.critical(f'Frame: {_frame}')
+                        # Read the waveform data sent by the instrument
+                        source_data = instr.read_binary_values_progress_bar(
+                            datatype=datatype, is_big_endian=True, expect_termination=True
+                        )
 
-                    # Read the waveform data sent by the instrument
-                    source_data = instr.read_binary_values_progress_bar(
-                        datatype=datatype, is_big_endian=True, expect_termination=True
-                    )
+                        if wave_type is WaveType.DIGITAL:
 
-                    if wave_type is WaveType.DIGITAL:
+                            # Digital channel to be decomposed into separate bits
+                            if decompose_dch:
+                                for bit in range(8):
+                                    result = self._post_process_digital_bits(
+                                        sources, source, source_data, x_scale, bit
+                                    )
+                                    if result:
+                                        yield result
 
-                        # Digital channel to be decomposed into separate bits
-                        if decompose_dch:
-                            for bit in range(8):
-                                result = self._post_process_digital_bits(
-                                    sources, source, source_data, x_scale, bit
+                            # Digital channel to be converted into an 8-bit word
+                            else:
+                                yield self._post_process_digital_byte(
+                                    source, source_data, x_scale
                                 )
-                                if result:
-                                    yield result
 
-                        # Digital channel to be converted into an 8-bit word
-                        else:
-                            yield self._post_process_digital_byte(
-                                source, source_data, x_scale
+                        elif wave_type is WaveType.ANALOG:
+                            yield self._post_process_analog(
+                                instr, source, source_data, x_scale
                             )
 
-                    elif wave_type is WaveType.ANALOG:
-                        yield self._post_process_analog(
-                            instr, source, source_data, x_scale
-                        )
+                        elif wave_type is WaveType.MATH:
+                            # Y-scale information for MATH channels is not supported at
+                            # this time
+                            yield source, source_data, x_scale, None
 
-                    elif wave_type is WaveType.MATH:
-                        # Y-scale information for MATH channels is not supported at
-                        # this time
-                        yield source, source_data, x_scale, None
-
-                    else:
-                        raise Exception(
-                            "It should have been impossible to execute this code"
-                        )
+                        else:
+                            raise Exception(
+                                "It should have been impossible to execute this code"
+                            )
 
         # Restore the acquisition state
         instr.write("ACQuire:STATE {}".format(acq_state))
