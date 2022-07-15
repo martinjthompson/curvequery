@@ -17,6 +17,7 @@ from ._pyvisa_tqdm_patch import _read_raw_progress_bar
 from ._pyvisa_tqdm_patch import read_binary_values_progress_bar
 from ._pyvisa_tqdm_patch import read_bytes_progress_bar
 
+log = logging.getLogger(__name__)
 
 def _parse_sources_from_select_query(source_text):
     """Take the list of sources returned from a `SELECT?` query with header and verbose set to ON and return a list of channels"""
@@ -57,7 +58,7 @@ class TekSeriesCurveFeat(base.FeatureBase):
                     inst, self._list_sources(inst), use_pbar, decompose_dch
                 ):
                     if verbose:
-                        print(ch)
+                        log.debug(ch)
                     result.data[ch] = Waveform(ch_data, x_scale, y_scale)
             except pyvisa.errors.VisaIOError:
                 get_event_queue(inst)
@@ -88,7 +89,7 @@ class TekSeriesCurveFeat(base.FeatureBase):
             display_on = bool(
                 int(instr.query("display:global:{}:state?".format(source)))
             )
-            # print (source, display_on)
+            # log.debug(source, display_on)
         return display_on
 
     @staticmethod
@@ -131,24 +132,24 @@ class TekSeriesCurveFeat(base.FeatureBase):
         """Returns a list of channel name strings that we could query"""
 
         # data:source:available does not return the digital channels on this scope, so we have to parse from a select query
-        # print ("Using select2")
+        # log.debug("Using select2")
         instr.write("verbose ON;header ON")
         result_string = instr.query("select?")
         instr.write("verbose OFF;header OFF")
         available_waveforms = _parse_sources_from_select_query(result_string)
-        # print (f"   Wfm:{available_waveforms}")
+        # log.debug(f"   Wfm:{available_waveforms}")
         # Only include channels that available for download
         useful_channels = [
             i for i in available_waveforms if self._has_data_available(instr, i)
         ]
-        # print (f"Useful:{useful_channels}")
+        # log.debug(f"Useful:{useful_channels}")
 
         # Return only waveforms that are available and have a corresponding useful
         # channel
         useful_waveforms = [
             i for i in available_waveforms if i in useful_channels
         ]
-        # print (f"UseWfm{useful_waveforms}")
+        # log.debug(f"UseWfm{useful_waveforms}")
         return useful_waveforms
 
     def _make_jobs(self, instr, sources):
