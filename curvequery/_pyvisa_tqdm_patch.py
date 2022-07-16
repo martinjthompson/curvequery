@@ -1,3 +1,5 @@
+import logging
+log = logging.getLogger(__name__)
 import struct
 
 from typing import Callable
@@ -67,7 +69,10 @@ def read_bytes_progress_bar(
                     size,
                     status,
                 )
+                logger.debug(f"Visalib {self.visalib} read")
                 chunk, status = self.visalib.read(self.session, size)
+
+                logger.debug(f"Visalib {self.visalib} read status is {status} and got {len(chunk)} bytes")
                 self.progress_bar(len(chunk))
                 ret.extend(chunk)
                 left_to_read -= len(chunk)
@@ -102,6 +107,7 @@ def _read_raw_progress_bar(self, size: Optional[int] = None):
 
     """
     size = self.chunk_size if size is None else size
+    logger.debug(f"Read {size} bytes with session {self.session}")
 
     loop_status = constants.StatusCode.success_max_count_read
 
@@ -119,7 +125,9 @@ def _read_raw_progress_bar(self, size: Optional[int] = None):
                     size,
                     status,
                 )
+                logger.info(f"Visalib {self.visalib} read")
                 chunk, status = self.visalib.read(self.session, size)
+                logger.info(f"Visalib {self.visalib} read status is {status} and got {len(chunk)} bytes")
                 self.progress_bar.update(len(chunk))
                 ret.extend(chunk)
         except errors.VisaIOError as e:
@@ -131,6 +139,7 @@ def _read_raw_progress_bar(self, size: Optional[int] = None):
             )
             raise
 
+    logger.info(f"Returning {len(ret)} bytes")
     return ret
 
 
@@ -176,7 +185,10 @@ def read_binary_values_progress_bar(
         Data read from the device.
 
     """
-    block = self._read_raw_progress_bar(chunk_size)
+    if not hasattr(self, 'block') or len(self.block) == 0:
+        self.block = self._read_raw_progress_bar(chunk_size)
+    block = self.block
+    logging.critical(f'Starting state of block is: {str(self.block[:10])}')
 
     if header_fmt == "ieee":
         offset, data_length = util.parse_ieee_block_header(block)
@@ -218,8 +230,15 @@ def read_binary_values_progress_bar(
     try:
         # Do not reparse the headers since it was already done and since
         # this allows for custom data length
-        return util.from_binary_block(
+        ret = util.from_binary_block(
             block, offset, data_length, datatype, is_big_endian, container
         )
     except ValueError as e:
         raise errors.InvalidBinaryFormat(e.args[0])
+    
+    self.block = self.block[expected_length+1:]
+    logging.critical(f'Next part of block is: {str(self.block[:10])}')
+    if len(self.block) > 0:
+        print (type(self.block[0]))
+        assert chr(self.block[0]) == '#', 'Start of remaining data ought to have a "#" as the first byte'
+    return ret
