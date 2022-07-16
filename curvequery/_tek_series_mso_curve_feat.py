@@ -58,7 +58,7 @@ class TekSeriesCurveFeat(base.FeatureBase):
                     inst, self._list_sources(inst), use_pbar, decompose_dch
                 ):
                     if verbose:
-                        log.debug(ch)
+                        log.debug(f"Just captured from {ch}")
                     result.data[ch] = Waveform(ch_data, x_scale, y_scale)
             except pyvisa.errors.VisaIOError:
                 get_event_queue(inst)
@@ -286,7 +286,7 @@ class TekSeriesCurveFeat(base.FeatureBase):
             for source in jobs:
                 
                 self._setup_curve_query(instr, source, jobs)
-
+                log.debug("Curve query is set up")
                 # extract the job parameters
                 wave_type, channel, encoding, bit_nr, datatype, rec_len = jobs[source]
 
@@ -294,52 +294,58 @@ class TekSeriesCurveFeat(base.FeatureBase):
                 x_scale = self._get_xscale(instr)
                 if x_scale is not None:
                     
-                    # Issue the curve query command
-                    instr.write("curv?")
+                    # Figure out how many FastFrames we are working with (if any)
                     fastframe_count = 1
                     fastframe_on = bool(int(instr.query('HOR:FAST:STATE?')))
                     log.critical(f'Fast frame on : {fastframe_on}')
                     if fastframe_on:
                         fastframe_count = int(instr.query('HOR:FAST:COUN?'))
                     log.critical(f'Fast frame count: {fastframe_count}')
+
+                    # Issue the curve query command
+                    instr.write("curv?")
+
+                    source_data = []
                     for _frame in range(fastframe_count):
                         log.critical(f'Frame: {_frame}')
                         # Read the waveform data sent by the instrument
-                        source_data = instr.read_binary_values_progress_bar(
+                        source_data_trace = instr.read_binary_values_progress_bar(
                             datatype=datatype, is_big_endian=True, expect_termination=True
                         )
+                        source_data.extend(source_data_trace)
+                        log.critical(f'Frame: {_frame} captured as {type(source_data_trace)} - all is {len(source_data)} long')
 
-                        if wave_type is WaveType.DIGITAL:
+                    if wave_type is WaveType.DIGITAL:
 
-                            # Digital channel to be decomposed into separate bits
-                            if decompose_dch:
-                                for bit in range(8):
-                                    result = self._post_process_digital_bits(
-                                        sources, source, source_data, x_scale, bit
-                                    )
-                                    if result:
-                                        yield result
-
-                            # Digital channel to be converted into an 8-bit word
-                            else:
-                                yield self._post_process_digital_byte(
-                                    source, source_data, x_scale
+                        # Digital channel to be decomposed into separate bits
+                        if decompose_dch:
+                            for bit in range(8):
+                                result = self._post_process_digital_bits(
+                                    sources, source, source_data, x_scale, bit
                                 )
+                                if result:
+                                    yield result
 
-                        elif wave_type is WaveType.ANALOG:
-                            yield self._post_process_analog(
-                                instr, source, source_data, x_scale
-                            )
-
-                        elif wave_type is WaveType.MATH:
-                            # Y-scale information for MATH channels is not supported at
-                            # this time
-                            yield source, source_data, x_scale, None
-
+                        # Digital channel to be converted into an 8-bit word
                         else:
-                            raise Exception(
-                                "It should have been impossible to execute this code"
+                            yield self._post_process_digital_byte(
+                                source, source_data, x_scale
                             )
+
+                    elif wave_type is WaveType.ANALOG:
+                        yield self._post_process_analog(
+                            instr, source, source_data, x_scale
+                        )
+
+                    elif wave_type is WaveType.MATH:
+                        # Y-scale information for MATH channels is not supported at
+                        # this time
+                        yield source, source_data, x_scale, None
+
+                    else:
+                        raise Exception(
+                            "It should have been impossible to execute this code"
+                        )
 
         # Restore the acquisition state
         instr.write("ACQuire:STATE {}".format(acq_state))
