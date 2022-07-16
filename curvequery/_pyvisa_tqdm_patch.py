@@ -188,7 +188,7 @@ def read_binary_values_progress_bar(
     if not hasattr(self, 'block') or len(self.block) == 0:
         self.block = self._read_raw_progress_bar(chunk_size)
     block = self.block
-    logging.debug(f'Starting state of block is: {str(self.block[:10])}')
+    # logging.debug(f'Starting state of block is: {str(self.block[:10])}')
 
     if header_fmt == "ieee":
         offset, data_length = util.parse_ieee_block_header(block)
@@ -237,7 +237,7 @@ def read_binary_values_progress_bar(
         raise errors.InvalidBinaryFormat(e.args[0])
     
     self.block = self.block[expected_length+1:]
-    logging.debug(f'Next part of block is: {str(self.block[:10])}')
+    # logging.debug(f'Next part of block is: {str(self.block[:10])}')
     if len(self.block) > 0:
         assert chr(self.block[0]) == '#', 'Start of remaining data ought to have a "#" as the first byte'
     return ret
