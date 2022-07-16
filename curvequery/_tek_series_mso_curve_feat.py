@@ -286,7 +286,6 @@ class TekSeriesCurveFeat(base.FeatureBase):
             for source in jobs:
                 
                 self._setup_curve_query(instr, source, jobs)
-                log.debug("Curve query is set up")
                 # extract the job parameters
                 wave_type, channel, encoding, bit_nr, datatype, rec_len = jobs[source]
 
@@ -297,24 +296,23 @@ class TekSeriesCurveFeat(base.FeatureBase):
                     # Figure out how many FastFrames we are working with (if any)
                     fastframe_count = 1
                     fastframe_on = bool(int(instr.query('HOR:FAST:STATE?')))
-                    log.critical(f'Fast frame on : {fastframe_on}')
                     if fastframe_on:
                         fastframe_count = int(instr.query('HOR:FAST:COUN?'))
-                    log.critical(f'Fast frame count: {fastframe_count}')
 
                     # Issue the curve query command
                     instr.write("curv?")
 
                     source_data = []
                     for _frame in range(fastframe_count):
-                        log.critical(f'Frame: {_frame}')
+                        log.debug(f"Capturing {channel}")
                         # Read the waveform data sent by the instrument
                         source_data_trace = instr.read_binary_values_progress_bar(
                             datatype=datatype, is_big_endian=True, expect_termination=True
                         )
                         source_data.extend(source_data_trace)
-                        log.critical(f'Frame: {_frame} captured as {type(source_data_trace)} - all is {len(source_data)} long')
+                        # log.debug(f'Frame: {_frame} captured - all is {len(source_data)} long')
 
+                    log.debug(f"Processing {channel}")
                     if wave_type is WaveType.DIGITAL:
 
                         # Digital channel to be decomposed into separate bits
@@ -347,5 +345,6 @@ class TekSeriesCurveFeat(base.FeatureBase):
                             "It should have been impossible to execute this code"
                         )
 
+                    log.debug(f"Processing {channel} done")
         # Restore the acquisition state
         instr.write("ACQuire:STATE {}".format(acq_state))
