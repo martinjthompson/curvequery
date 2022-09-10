@@ -38,7 +38,7 @@ def _parse_sources_from_select_query(source_text):
 
 
 class TekSeriesCurveFeat(base.FeatureBase):
-    def feature(self, *, use_pbar=True, decompose_dch=True, verbose=False):
+    def feature(self, *, use_pbar=True, decompose_dch=True, verbose=False, raw_analog_samples=False):
         """
         Returns a WaveformCollection object containing waveform data available on the
         instrument.
@@ -47,7 +47,8 @@ class TekSeriesCurveFeat(base.FeatureBase):
             use_pbar (bool): Optionally display a progress bar. (default: False)
             decompose_dch (bool): Optionally convert a DCH channel into eight separate
                 1-bit channels. (default: True)
-            verbose (bool): Display additional information
+            verbose (bool): Display additional information. (default: False)
+            raw_analog_samples (bool): If True, do not scale the analog samples, and return the raw ADC values. (default: False)
         """
         with self.resource_manager.open_resource(self.resource_name) as inst:
             result = WaveformCollection()
@@ -55,7 +56,7 @@ class TekSeriesCurveFeat(base.FeatureBase):
             # iterate through all available sources
             try:
                 for ch, ch_data, x_scale, y_scale in self._get_data(
-                    inst, self._list_sources(inst), use_pbar, decompose_dch
+                    inst, self._list_sources(inst), use_pbar, decompose_dch, raw_analog_samples
                 ):
                     if verbose:
                         log.debug(f"Just captured from {ch}")
@@ -243,7 +244,7 @@ class TekSeriesCurveFeat(base.FeatureBase):
             digital.append(a)
         return source.split("_")[0], digital, x_scale, None
 
-    def _get_data(self, instr, sources, use_pbar, decompose_dch):
+    def _get_data(self, instr, sources, use_pbar, decompose_dch, raw_analog_samples):
         """Returns an iterator that yields the source data from the oscilloscope"""
         if decompose_dch:
             logging.warning("Are you sure you want decompose_dch? It seems to end up with no digital data at all.")
@@ -331,9 +332,12 @@ class TekSeriesCurveFeat(base.FeatureBase):
                             )
 
                     elif wave_type is WaveType.ANALOG:
-                        yield self._post_process_analog(
-                            instr, source, source_data, x_scale
-                        )
+                        if raw_analog_samples:
+                            yield source, source_data, x_scale, None
+                        else:
+                            yield self._post_process_analog(
+                                instr, source, source_data, x_scale
+                            )
 
                     elif wave_type is WaveType.MATH:
                         # Y-scale information for MATH channels is not supported at
