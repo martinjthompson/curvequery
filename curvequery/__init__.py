@@ -1,1 +1,1 @@
-__VERSION__ = "3.1.1mjt"
+__VERSION__ = "3.1.1+mjt"
