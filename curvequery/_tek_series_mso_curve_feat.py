@@ -52,7 +52,8 @@ class TekSeriesCurveFeat(base.FeatureBase):
         """
         with self.resource_manager.open_resource(self.resource_name) as inst:
             result = WaveformCollection()
-
+            # inst.chunk_size = 1000000
+            # inst.timeout = 500
             # iterate through all available sources
             try:
                 for ch, ch_data, x_scale, y_scale in self._get_data(
@@ -257,10 +258,15 @@ class TekSeriesCurveFeat(base.FeatureBase):
 
         # Calculate the total number of bytes of data to be downloaded from the
         # instrument
+        # Figure out how many FastFrames we are working with (if any)
+        fastframe_count = 1
+        fastframe_on = bool(int(instr.query('HOR:FAST:STATE?')))
+        if fastframe_on:
+            fastframe_count = int(instr.query('HOR:FAST:COUN?'))
         bytes_per_sample = {"FPBinary": 4, "RIBinary": 2}
         total_bytes = reduce(
             lambda a, b: a + b,
-            [bytes_per_sample[jobs[i].encoding] * jobs[i].record_length for i in jobs],
+            [bytes_per_sample[jobs[i].encoding] * jobs[i].record_length * fastframe_count for i in jobs],
         )
 
         with tqdm(
@@ -294,11 +300,6 @@ class TekSeriesCurveFeat(base.FeatureBase):
                 x_scale = self._get_xscale(instr)
                 if x_scale is not None:
                     
-                    # Figure out how many FastFrames we are working with (if any)
-                    fastframe_count = 1
-                    fastframe_on = bool(int(instr.query('HOR:FAST:STATE?')))
-                    if fastframe_on:
-                        fastframe_count = int(instr.query('HOR:FAST:COUN?'))
 
                     # Issue the curve query command
                     instr.write("curv?")
