@@ -53,7 +53,6 @@ class TekSeriesCurveFeat(base.FeatureBase):
         with self.resource_manager.open_resource(self.resource_name) as inst:
             result = WaveformCollection()
             # inst.chunk_size = 1000000
-            # inst.timeout = 500
             # iterate through all available sources
             try:
                 for ch, ch_data, x_scale, y_scale in self._get_data(
@@ -202,6 +201,8 @@ class TekSeriesCurveFeat(base.FeatureBase):
         rec_len = instr.query("horizontal:recordlength?").strip()
         instr.write("data:start 1")
         instr.write("data:stop {}".format(rec_len))
+        # instr.timeout = int(rec_len)
+        # log.critical(f'Set timeout to {instr.timeout/1000}s for {rec_len} samples')
 
     def _post_process_analog(self, instr, source, source_data, x_scale):
         """Post processes analog channel data"""
@@ -300,7 +301,6 @@ class TekSeriesCurveFeat(base.FeatureBase):
                 x_scale = self._get_xscale(instr)
                 if x_scale is not None:
                     
-
                     # Issue the curve query command
                     instr.write("curv?")
 
