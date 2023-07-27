@@ -2,6 +2,7 @@ import logging
 import types
 from functools import reduce
 
+import numpy as np
 from visadore import base
 import pyvisa
 from tqdm import tqdm
@@ -206,7 +207,6 @@ class TekSeriesCurveFeat(base.FeatureBase):
 
     def _post_process_analog(self, instr, source, source_data, x_scale):
         """Post processes analog channel data"""
-
         # Normal analog channels must have the vertical scale and offset applied
         offset = float(instr.query("WFMOutpre:YZEro?"))
         scale = float(instr.query("WFMOutpre:YMUlt?"))
@@ -309,8 +309,10 @@ class TekSeriesCurveFeat(base.FeatureBase):
                         log.debug(f"Capturing {channel}")
                         # Read the waveform data sent by the instrument
                         source_data_trace = instr.read_binary_values_progress_bar(
-                            datatype=datatype, is_big_endian=True, expect_termination=True
+                            datatype=datatype, is_big_endian=True, expect_termination=True,
+                            chunk_size=int(1e6)
                         )
+                        log.debug(f"Extending {channel}")
                         source_data.extend(source_data_trace)
                         # log.debug(f'Frame: {_frame} captured - all is {len(source_data)} long')
 
